@@ -1,0 +1,353 @@
+{
+  "info": {
+    "name": "2.7 \u2014 Restaurant Integration Tests",
+    "description": "Run the whole collection in order. Tests cover all five Restaurant CRUD methods with at least three meaningful tests each. Each run creates a unique restaurant and removes only its own record. Use the local coursework API. No response-time assertions.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://127.0.0.1:3000"
+    },
+    {
+      "key": "testRestaurantId",
+      "value": ""
+    },
+    {
+      "key": "createdRestaurant",
+      "value": ""
+    },
+    {
+      "key": "updatedRestaurant",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "01 Create",
+      "item": [
+        {
+          "name": "01 POST \u2014 Create restaurant",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/restaurants",
+            "body": {
+              "mode": "raw",
+              "raw": "{{createdRestaurant}}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(() => {",
+                  "// Each run creates its own restaurant and later deletes only that record.",
+                  "pm.collectionVariables.unset('testRestaurantId');",
+                  "const suffix = pm.variables.replaceIn('{{$guid}}');",
+                  "const data = { name: 'Postman Restaurant ' + suffix, cuisine: 'Italian', rating: 4.5, isOpen: true, openedOn: '2024-06-01' };",
+                  "pm.collectionVariables.set('createdRestaurant', JSON.stringify(data));",
+                  "pm.collectionVariables.set('updatedRestaurant', JSON.stringify({ ...data, cuisine: 'Mediterranean', rating: 5, isOpen: false, openedOn: '2025-01-15' }));",
+                  "})();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(() => {",
+                  "const data = pm.response.json();",
+                  "const expected = JSON.parse(pm.collectionVariables.get('createdRestaurant'));",
+                  "pm.test('POST returns 201 Created', () => pm.response.to.have.status(201));",
+                  "pm.test('POST returns a valid MongoDB ID', () => pm.expect(data._id).to.match(/^[a-f0-9]{24}$/));",
+                  "pm.test('POST returns all submitted values', () => {",
+                  "    pm.expect(data.name).to.eql(expected.name);",
+                  "    pm.expect(data.cuisine).to.eql(expected.cuisine);",
+                  "    pm.expect(data.rating).to.eql(expected.rating);",
+                  "    pm.expect(data.isOpen).to.eql(expected.isOpen);",
+                  "    pm.expect(data.openedOn).to.eql(new Date(expected.openedOn).toISOString());",
+                  "});",
+                  "pm.test('POST Location identifies the created resource', () => {",
+                  "    pm.expect(pm.response.headers.get('Location')).to.eql('/api/restaurants/' + data._id);",
+                  "});",
+                  "if (pm.response.code === 201 && /^[a-f0-9]{24}$/.test(data._id)) {",
+                  "    pm.collectionVariables.set('testRestaurantId', data._id);",
+                  "}",
+                  "})();"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "02 Read",
+      "item": [
+        {
+          "name": "02 GET \u2014 List restaurants",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/restaurants"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(() => {",
+                  "const data = pm.response.json();",
+                  "const id = pm.collectionVariables.get('testRestaurantId');",
+                  "const expected = JSON.parse(pm.collectionVariables.get('createdRestaurant'));",
+                  "pm.test('GET list returns 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('GET list returns an array of restaurant records', () => {",
+                  "    pm.expect(data).to.be.an('array');",
+                  "    pm.expect(data.length).to.be.greaterThan(0);",
+                  "    data.forEach((item) => {",
+                  "        pm.expect(item._id).to.match(/^[a-f0-9]{24}$/);",
+                  "        pm.expect(item).to.have.all.keys('_id', 'name', 'cuisine', 'rating', 'isOpen', 'openedOn');",
+                  "    });",
+                  "});",
+                  "pm.test('GET list includes the newly created restaurant', () => {",
+                  "    pm.expect(data.some((item) => item._id === id)).to.eql(true);",
+                  "});",
+                  "pm.test('GET list shows persisted field values', () => {",
+                  "    const item = data.find((item) => item._id === id);",
+                  "    pm.expect(item.name).to.eql(expected.name);",
+                  "    pm.expect(item.cuisine).to.eql(expected.cuisine);",
+                  "    pm.expect(item.rating).to.eql(expected.rating);",
+                  "    pm.expect(item.isOpen).to.eql(expected.isOpen);",
+                  "    pm.expect(item.openedOn).to.eql(new Date(expected.openedOn).toISOString());",
+                  "});",
+                  "})();"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "03 GET by ID \u2014 Read created restaurant",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/restaurants/{{testRestaurantId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(() => {",
+                  "const data = pm.response.json();",
+                  "const expected = JSON.parse(pm.collectionVariables.get('createdRestaurant'));",
+                  "pm.test('GET by ID returns 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('GET by ID returns the requested ID', () => {",
+                  "    pm.expect(data._id).to.eql(pm.collectionVariables.get('testRestaurantId'));",
+                  "});",
+                  "pm.test('GET by ID returns the expected field values', () => {",
+                  "    pm.expect(data.name).to.eql(expected.name);",
+                  "    pm.expect(data.cuisine).to.eql(expected.cuisine);",
+                  "    pm.expect(data.rating).to.eql(expected.rating);",
+                  "    pm.expect(data.isOpen).to.eql(expected.isOpen);",
+                  "    pm.expect(data.openedOn).to.eql(new Date(expected.openedOn).toISOString());",
+                  "});",
+                  "pm.test('GET by ID preserves the schema and JSON types', () => {",
+                  "    pm.expect(data).to.have.all.keys('_id', 'name', 'cuisine', 'rating', 'isOpen', 'openedOn');",
+                  "    pm.expect(data.name).to.be.a('string');",
+                  "    pm.expect(data.cuisine).to.be.a('string');",
+                  "    pm.expect(data.rating).to.be.a('number');",
+                  "    pm.expect(data.isOpen).to.be.a('boolean');",
+                  "    pm.expect(data.openedOn).to.eql(new Date(expected.openedOn).toISOString());",
+                  "});",
+                  "})();"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "03 Update",
+      "item": [
+        {
+          "name": "04 PUT by ID \u2014 Replace restaurant",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/restaurants/{{testRestaurantId}}",
+            "body": {
+              "mode": "raw",
+              "raw": "{{updatedRestaurant}}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(() => {",
+                  "const data = pm.response.json();",
+                  "const expected = JSON.parse(pm.collectionVariables.get('updatedRestaurant'));",
+                  "pm.test('PUT returns 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('PUT returns the requested ID', () => {",
+                  "    pm.expect(data._id).to.eql(pm.collectionVariables.get('testRestaurantId'));",
+                  "});",
+                  "pm.test('PUT returns the expected field values', () => {",
+                  "    pm.expect(data.name).to.eql(expected.name);",
+                  "    pm.expect(data.cuisine).to.eql(expected.cuisine);",
+                  "    pm.expect(data.rating).to.eql(expected.rating);",
+                  "    pm.expect(data.isOpen).to.eql(expected.isOpen);",
+                  "    pm.expect(data.openedOn).to.eql(new Date(expected.openedOn).toISOString());",
+                  "});",
+                  "pm.test('PUT preserves the schema and JSON types', () => {",
+                  "    pm.expect(data).to.have.all.keys('_id', 'name', 'cuisine', 'rating', 'isOpen', 'openedOn');",
+                  "    pm.expect(data.name).to.be.a('string');",
+                  "    pm.expect(data.cuisine).to.be.a('string');",
+                  "    pm.expect(data.rating).to.be.a('number');",
+                  "    pm.expect(data.isOpen).to.be.a('boolean');",
+                  "    pm.expect(data.openedOn).to.eql(new Date(expected.openedOn).toISOString());",
+                  "});",
+                  "})();"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "05 GET by ID \u2014 Verify update persisted",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/restaurants/{{testRestaurantId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(() => {",
+                  "const data = pm.response.json();",
+                  "const expected = JSON.parse(pm.collectionVariables.get('updatedRestaurant'));",
+                  "pm.test('GET after PUT returns 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('GET after PUT returns the requested ID', () => {",
+                  "    pm.expect(data._id).to.eql(pm.collectionVariables.get('testRestaurantId'));",
+                  "});",
+                  "pm.test('GET after PUT returns the expected field values', () => {",
+                  "    pm.expect(data.name).to.eql(expected.name);",
+                  "    pm.expect(data.cuisine).to.eql(expected.cuisine);",
+                  "    pm.expect(data.rating).to.eql(expected.rating);",
+                  "    pm.expect(data.isOpen).to.eql(expected.isOpen);",
+                  "    pm.expect(data.openedOn).to.eql(new Date(expected.openedOn).toISOString());",
+                  "});",
+                  "pm.test('GET after PUT preserves the schema and JSON types', () => {",
+                  "    pm.expect(data).to.have.all.keys('_id', 'name', 'cuisine', 'rating', 'isOpen', 'openedOn');",
+                  "    pm.expect(data.name).to.be.a('string');",
+                  "    pm.expect(data.cuisine).to.be.a('string');",
+                  "    pm.expect(data.rating).to.be.a('number');",
+                  "    pm.expect(data.isOpen).to.be.a('boolean');",
+                  "    pm.expect(data.openedOn).to.eql(new Date(expected.openedOn).toISOString());",
+                  "});",
+                  "})();"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "04 Delete and verify",
+      "item": [
+        {
+          "name": "06 DELETE by ID \u2014 Remove restaurant",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": "{{baseUrl}}/api/restaurants/{{testRestaurantId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(() => {",
+                  "pm.test('DELETE returns 204 No Content', () => pm.response.to.have.status(204));",
+                  "pm.test('DELETE returns an empty response body', () => pm.expect(pm.response.text()).to.eql(''));",
+                  "// Confirm the database record is gone, rather than checking only the status.",
+                  "const url = pm.collectionVariables.get('baseUrl') + '/api/restaurants/' + pm.collectionVariables.get('testRestaurantId');",
+                  "pm.sendRequest(url, (error, response) => {",
+                  "    pm.test('DELETE removes the record: subsequent GET returns 404 and a clear error', () => {",
+                  "        pm.expect(error).to.eql(null);",
+                  "        pm.expect(response.code).to.eql(404);",
+                  "        pm.expect(response.json()).to.deep.eql({ error: 'Restaurant not found.' });",
+                  "    });",
+                  "});",
+                  "})();"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "07 GET \u2014 Verify deleted restaurant is absent",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/restaurants"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(() => {",
+                  "const data = pm.response.json();",
+                  "pm.test('GET after DELETE returns 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('GET after DELETE still returns an array', () => pm.expect(data).to.be.an('array'));",
+                  "pm.test('Deleted restaurant is absent from stored records', () => {",
+                  "    const id = pm.collectionVariables.get('testRestaurantId');",
+                  "    pm.expect(id).to.match(/^[a-f0-9]{24}$/);",
+                  "    pm.expect(data.some((item) => item._id === id)).to.eql(false);",
+                  "});",
+                  "})();"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

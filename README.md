@@ -43,6 +43,16 @@ The relationship checks are suitable for the sequential coursework workflow. The
 
 Import `postman/Restaurant-API.postman_collection.json`. Start the API, then run the collection in order using Collection Runner, or send each numbered request manually. Creation requests save IDs as collection variables. The collection covers all CRUD routes, populated relationships, validation errors, missing IDs, and the parent deletion conflict. The last requests delete the records created by this run.
 
+### Restaurant integration collection
+
+`postman/Restaurant-Integration-Tests.postman_collection.json` tests the Restaurant resource. Import it into Postman, start the API, and run the entire collection in order with one iteration and no data file. Keep `baseUrl` set to `http://127.0.0.1:3000` for the default local server. The runner creates a unique restaurant and saves its ID automatically; no manual ID setup is needed.
+
+The collection groups seven requests into Create, Read, Update, and Delete folders. It includes 26 named tests, with at least three tests for each of POST, GET all, GET by ID, PUT by ID, and DELETE by ID. Assertions check status codes, record IDs, all submitted field values, JSON types, persisted updates, and confirmed deletion. DELETE returns no payload, so its tests check the empty body and make a follow-up GET to confirm a 404 error. There are no response-time tests.
+
+A successful full run shows 26 passing tests. The runner also makes one follow-up GET from the DELETE script. The collection deletes only the restaurant created by its own run. If the run is interrupted, that restaurant may remain; rerunning creates a new one.
+
+Test syntax follows [Postman's test examples](https://learning.postman.com/docs/tests-and-scripts/write-scripts/test-examples/).
+
 ## Verification
 
 ```sh
