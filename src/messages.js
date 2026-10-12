@@ -1,0 +1,21 @@
+// Shared API messages keep controller and middleware responses consistent.
+module.exports = {
+  API_NAME: 'Restaurant API',
+  RESTAURANT_NOT_FOUND: 'Restaurant not found.',
+  MENU_ITEM_NOT_FOUND: 'Menu item not found.',
+  RELATED_RESTAURANT_NOT_FOUND: 'Related restaurant not found.',
+  RESTAURANT_HAS_ITEMS: 'Delete this restaurant’s menu items before deleting the restaurant.',
+  INVALID_ID: 'ID must be a 24-character hexadecimal ObjectId.',
+  INVALID_RESTAURANT_ID: 'restaurant must be a valid ObjectId.',
+  INVALID_BODY: 'Request body must be a JSON object.',
+  VALIDATION_FAILED: 'Validation failed.',
+  INVALID_FIELD: 'Invalid field value or unknown field.',
+  INVALID_JSON: 'Invalid JSON body.',
+  BODY_TOO_LARGE: 'Request body exceeds 32 KB.',
+  DUPLICATE_RECORD: 'Duplicate record.',
+  ROUTE_NOT_FOUND: 'Route not found.',
+  INTERNAL_ERROR: 'Internal server error.',
+  UNEXPECTED_ERROR: 'Unexpected request error:',
+  unknownFields: (fields) => `Unknown fields: ${fields.join(', ')}`,
+  requiredType: (field, type) => `${field} is required and must be a ${type}.`,
+};

@@ -95,3 +95,58 @@ test('malformed IDs, missing documents, invalid JSON and unknown routes have cle
   const health = await request(app).get('/').expect(200);
   assert.equal(health.body.databaseConnected, true);
 });
+
+test('both directions are populated and stored version fields are excluded from responses', async () => {
+  const parent = await request(app).post('/api/restaurants').send(restaurant).expect(201);
+  const parentId = parent.body._id;
+  assert.deepEqual(parent.body.menuItems, []);
+  assert.equal(Object.hasOwn(parent.body, '__v'), false);
+  assert.equal((await Restaurant.findById(parentId).lean()).__v, 0);
+  const created = await request(app).post('/api/menu-items').send(menuItem(parentId)).expect(201);
+  assert.equal(created.body.restaurant._id, parentId);
+  assert.equal(created.body.restaurant.name, restaurant.name);
+  assert.equal(Object.hasOwn(created.body, '__v'), false);
+  assert.equal(Object.hasOwn(created.body.restaurant, '__v'), false);
+  assert.equal((await MenuItem.findById(created.body._id).lean()).__v, 0);
+  const fetched = await request(app).get(`/api/restaurants/${parentId}`).expect(200);
+  assert.equal(fetched.body.menuItems.length, 1);
+  assert.equal(fetched.body.menuItems[0]._id, created.body._id);
+  assert.equal(Object.hasOwn(fetched.body.menuItems[0], '__v'), false);
+  const parents = await request(app).get('/api/restaurants').expect(200);
+  assert.equal(parents.body[0].menuItems[0]._id, created.body._id);
+  const items = await request(app).get('/api/menu-items').expect(200);
+  assert.equal(items.body[0].restaurant._id, parentId);
+  assert.equal(Object.hasOwn(items.body[0].restaurant, '__v'), false);
+});
+
+test('replacing a menu item moves the reverse relationship and deletion removes it', async () => {
+  const first = await Restaurant.create(restaurant);
+  const second = await Restaurant.create({ ...restaurant, name: 'Second Kitchen' });
+  const child = await MenuItem.create(menuItem(first.id));
+  const updated = await request(app).put(`/api/menu-items/${child.id}`).send(menuItem(second.id)).expect(200);
+  assert.equal(updated.body.restaurant._id, second.id);
+  const previous = await request(app).get(`/api/restaurants/${first.id}`).expect(200);
+  assert.deepEqual(previous.body.menuItems, []);
+  const current = await request(app).get(`/api/restaurants/${second.id}`).expect(200);
+  assert.equal(current.body.menuItems[0]._id, child.id);
+  await request(app).delete(`/api/menu-items/${child.id}`).expect(204);
+  const afterDelete = await request(app).get(`/api/restaurants/${second.id}`).expect(200);
+  assert.deepEqual(afterDelete.body.menuItems, []);
+});
+
+test('valid but missing IDs return shared not-found messages for GET, PUT and DELETE', async () => {
+  const id = new mongoose.Types.ObjectId().toString();
+  for (const [base, body, error] of [
+    ['/api/restaurants', restaurant, 'Restaurant not found.'],
+    ['/api/menu-items', menuItem(id), 'Menu item not found.'],
+  ]) {
+    for (const method of ['get', 'put', 'delete']) {
+      let query = request(app)[method](`${base}/${id}`);
+      if (method === 'put') query = query.send(body);
+      const result = await query.expect(404);
+      assert.deepEqual(result.body, { error });
+    }
+  }
+  assert.equal(await Restaurant.countDocuments(), 0);
+  assert.equal(await MenuItem.countDocuments(), 0);
+});

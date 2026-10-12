@@ -6,6 +6,6 @@ const menuItemSchema = new mongoose.Schema({
   available: { type: Boolean, required: true },
   category: { type: String, required: true, enum: ['starter', 'main', 'dessert', 'drink'] },
   restaurant: { type: mongoose.Schema.Types.ObjectId, ref: 'Restaurant', required: true, index: true },
-}, { strict: 'throw', versionKey: false });
+}, { strict: 'throw' });
 
 module.exports = mongoose.model('MenuItem', menuItemSchema);

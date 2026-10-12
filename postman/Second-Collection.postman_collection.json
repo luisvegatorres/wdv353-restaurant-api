@@ -1,0 +1,551 @@
+{
+  "info": {
+    "name": "Module 2 \u2014 Second Collection Relationships",
+    "description": "Run in order against the local Restaurant API. Creates its own restaurant, uses that ID to create a menu item, displays both directions, checks all second collection CRUD payloads and missing IDs, then deletes its own records.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://127.0.0.1:3000"
+    },
+    {
+      "key": "parentId",
+      "value": ""
+    },
+    {
+      "key": "childId",
+      "value": ""
+    },
+    {
+      "key": "parentBody",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "01 Create and display relationships",
+      "item": [
+        {
+          "name": "01 Create first collection record",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/restaurants",
+            "body": {
+              "mode": "raw",
+              "raw": "{{parentBody}}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(() => {",
+                  "pm.collectionVariables.unset('parentId');",
+                  "pm.collectionVariables.unset('childId');",
+                  "const suffix = pm.variables.replaceIn('{{$guid}}');",
+                  "pm.collectionVariables.set('parentBody', JSON.stringify({name: 'Relationship Kitchen ' + suffix, cuisine: 'Italian', rating: 4.5, isOpen: true, openedOn: '2024-06-01'}));",
+                  "})();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(() => {",
+                  "pm.test('01 Create first collection record: HTTP 201', () => pm.response.to.have.status(201));",
+                  "",
+                  "const result = pm.response.json();",
+                  "pm.test('Parent fields match the submitted restaurant', () => {",
+                  "    pm.expect(result.name).to.eql(JSON.parse(pm.collectionVariables.get('parentBody')).name);",
+                  "    pm.expect(result.menuItems).to.deep.eql([]);",
+                  "});",
+                  "pm.test('Parent excludes version metadata', () => pm.expect(result).not.to.have.property('__v'));",
+                  "if (pm.response.code === 201) pm.collectionVariables.set('parentId', result._id);",
+                  "})();"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "02 POST second collection using first collection ID",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/menu-items",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"name\":\"Margherita Pizza\",\"price\":12.5,\"available\":true,\"category\":\"main\",\"restaurant\":\"{{parentId}}\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(() => {",
+                  "pm.test('02 POST second collection using first collection ID: HTTP 201', () => pm.response.to.have.status(201));",
+                  "",
+                  "const result = pm.response.json();",
+                  "pm.test('Menu payload has the expected values', () => {",
+                  "    pm.expect(result.name).to.eql('Margherita Pizza');",
+                  "    pm.expect(result.price).to.eql(12.5);",
+                  "    pm.expect(result.available).to.eql(true);",
+                  "    pm.expect(result.category).to.eql('main');",
+                  "});",
+                  "pm.test('Restaurant is populated from the first collection ID', () => {",
+                  "    pm.expect(result.restaurant._id).to.eql(pm.collectionVariables.get('parentId'));",
+                  "    pm.expect(result.restaurant.name).to.eql(JSON.parse(pm.collectionVariables.get('parentBody')).name);",
+                  "});",
+                  "pm.test('Version metadata is excluded from child and parent', () => {",
+                  "    pm.expect(result).not.to.have.property('__v');",
+                  "    pm.expect(result.restaurant).not.to.have.property('__v');",
+                  "});",
+                  "",
+                  "if (pm.response.code === 201) pm.collectionVariables.set('childId', result._id);",
+                  "})();"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "03 GET all menu item payloads",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/menu-items"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(() => {",
+                  "pm.test('03 GET all menu item payloads: HTTP 200', () => pm.response.to.have.status(200));",
+                  "",
+                  "const result = pm.response.json();",
+                  "pm.test('Menu list contains the created item', () => {",
+                  "    pm.expect(result).to.be.an('array');",
+                  "    pm.expect(result.some(item => item._id === pm.collectionVariables.get('childId'))).to.eql(true);",
+                  "});",
+                  "pm.test('List displays related restaurants without version fields', () => {",
+                  "    const item = result.find(item => item._id === pm.collectionVariables.get('childId'));",
+                  "    pm.expect(item.restaurant._id).to.eql(pm.collectionVariables.get('parentId'));",
+                  "    pm.expect(item).not.to.have.property('__v');",
+                  "    pm.expect(item.restaurant).not.to.have.property('__v');",
+                  "});",
+                  "})();"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "04 GET second collection by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/menu-items/{{childId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(() => {",
+                  "pm.test('04 GET second collection by ID: HTTP 200', () => pm.response.to.have.status(200));",
+                  "",
+                  "const result = pm.response.json();",
+                  "pm.test('Menu payload has the expected values', () => {",
+                  "    pm.expect(result.name).to.eql('Margherita Pizza');",
+                  "    pm.expect(result.price).to.eql(12.5);",
+                  "    pm.expect(result.available).to.eql(true);",
+                  "    pm.expect(result.category).to.eql('main');",
+                  "});",
+                  "pm.test('Restaurant is populated from the first collection ID', () => {",
+                  "    pm.expect(result.restaurant._id).to.eql(pm.collectionVariables.get('parentId'));",
+                  "    pm.expect(result.restaurant.name).to.eql(JSON.parse(pm.collectionVariables.get('parentBody')).name);",
+                  "});",
+                  "pm.test('Version metadata is excluded from child and parent', () => {",
+                  "    pm.expect(result).not.to.have.property('__v');",
+                  "    pm.expect(result.restaurant).not.to.have.property('__v');",
+                  "});",
+                  "})();"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "05 GET restaurant with populated menu items",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/restaurants/{{parentId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(() => {",
+                  "pm.test('05 GET restaurant with populated menu items: HTTP 200', () => pm.response.to.have.status(200));",
+                  "",
+                  "const result = pm.response.json();",
+                  "pm.test('Reverse relationship contains the menu item', () => {",
+                  "    pm.expect(result.menuItems).to.be.an('array');",
+                  "    pm.expect(result.menuItems).to.have.lengthOf(1);",
+                  "    pm.expect(result.menuItems[0]._id).to.eql(pm.collectionVariables.get('childId'));",
+                  "    pm.expect(result.menuItems[0].restaurant).to.eql(result._id);",
+                  "});",
+                  "pm.test('Reverse relationship displays child values and excludes version', () => {",
+                  "    pm.expect(result.menuItems[0].name).to.eql('Margherita Pizza');",
+                  "    pm.expect(result).not.to.have.property('__v');",
+                  "    pm.expect(result.menuItems[0]).not.to.have.property('__v');",
+                  "});",
+                  "})();"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "02 Update and verify storage",
+      "item": [
+        {
+          "name": "06 PUT menu item by ID",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/menu-items/{{childId}}",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"name\":\"Margherita Pizza\",\"price\":15,\"available\":false,\"category\":\"main\",\"restaurant\":\"{{parentId}}\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(() => {",
+                  "pm.test('06 PUT menu item by ID: HTTP 200', () => pm.response.to.have.status(200));",
+                  "",
+                  "const result = pm.response.json();",
+                  "pm.test('Menu payload has the expected values', () => {",
+                  "    pm.expect(result.name).to.eql('Margherita Pizza');",
+                  "    pm.expect(result.price).to.eql(15);",
+                  "    pm.expect(result.available).to.eql(false);",
+                  "    pm.expect(result.category).to.eql('main');",
+                  "});",
+                  "pm.test('Restaurant is populated from the first collection ID', () => {",
+                  "    pm.expect(result.restaurant._id).to.eql(pm.collectionVariables.get('parentId'));",
+                  "    pm.expect(result.restaurant.name).to.eql(JSON.parse(pm.collectionVariables.get('parentBody')).name);",
+                  "});",
+                  "pm.test('Version metadata is excluded from child and parent', () => {",
+                  "    pm.expect(result).not.to.have.property('__v');",
+                  "    pm.expect(result.restaurant).not.to.have.property('__v');",
+                  "});",
+                  "})();"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "07 GET stored updated menu item",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/menu-items/{{childId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(() => {",
+                  "pm.test('07 GET stored updated menu item: HTTP 200', () => pm.response.to.have.status(200));",
+                  "",
+                  "const result = pm.response.json();",
+                  "pm.test('Menu payload has the expected values', () => {",
+                  "    pm.expect(result.name).to.eql('Margherita Pizza');",
+                  "    pm.expect(result.price).to.eql(15);",
+                  "    pm.expect(result.available).to.eql(false);",
+                  "    pm.expect(result.category).to.eql('main');",
+                  "});",
+                  "pm.test('Restaurant is populated from the first collection ID', () => {",
+                  "    pm.expect(result.restaurant._id).to.eql(pm.collectionVariables.get('parentId'));",
+                  "    pm.expect(result.restaurant.name).to.eql(JSON.parse(pm.collectionVariables.get('parentBody')).name);",
+                  "});",
+                  "pm.test('Version metadata is excluded from child and parent', () => {",
+                  "    pm.expect(result).not.to.have.property('__v');",
+                  "    pm.expect(result.restaurant).not.to.have.property('__v');",
+                  "});",
+                  "})();"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "03 Missing IDs and relationship errors",
+      "item": [
+        {
+          "name": "08 GET missing menu item",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/menu-items/000000000000000000000001"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(() => {",
+                  "pm.test('08 GET missing menu item: HTTP 404', () => pm.response.to.have.status(404));",
+                  "",
+                  "pm.test('Missing object returns the shared not-found message', () => {",
+                  "    pm.expect(pm.response.json()).to.deep.eql({error: 'Menu item not found.'});",
+                  "});",
+                  "})();"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "09 PUT missing menu item",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/menu-items/000000000000000000000001",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"name\":\"Margherita Pizza\",\"price\":12.5,\"available\":true,\"category\":\"main\",\"restaurant\":\"{{parentId}}\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(() => {",
+                  "pm.test('09 PUT missing menu item: HTTP 404', () => pm.response.to.have.status(404));",
+                  "",
+                  "pm.test('Missing object returns the shared not-found message', () => {",
+                  "    pm.expect(pm.response.json()).to.deep.eql({error: 'Menu item not found.'});",
+                  "});",
+                  "})();"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "10 DELETE missing menu item",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": "{{baseUrl}}/api/menu-items/000000000000000000000001"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(() => {",
+                  "pm.test('10 DELETE missing menu item: HTTP 404', () => pm.response.to.have.status(404));",
+                  "",
+                  "pm.test('Missing object returns the shared not-found message', () => {",
+                  "    pm.expect(pm.response.json()).to.deep.eql({error: 'Menu item not found.'});",
+                  "});",
+                  "})();"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "11 Prevent deleting restaurant with menu items",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": "{{baseUrl}}/api/restaurants/{{parentId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(() => {",
+                  "pm.test('11 Prevent deleting restaurant with menu items: HTTP 409', () => pm.response.to.have.status(409));",
+                  "",
+                  "pm.test('Conflict payload explains the relationship rule', () => {",
+                  "    pm.expect(pm.response.json()).to.deep.eql({error: 'Delete this restaurant\u2019s menu items before deleting the restaurant.'});",
+                  "});",
+                  "})();"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "04 Delete and verify relationships",
+      "item": [
+        {
+          "name": "12 DELETE menu item",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": "{{baseUrl}}/api/menu-items/{{childId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(() => {",
+                  "pm.test('12 DELETE menu item: HTTP 204', () => pm.response.to.have.status(204));",
+                  "pm.test('Successful delete has no response payload', () => pm.expect(pm.response.text()).to.eql(''));",
+                  "})();"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "13 GET deleted menu item",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/menu-items/{{childId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(() => {",
+                  "pm.test('13 GET deleted menu item: HTTP 404', () => pm.response.to.have.status(404));",
+                  "pm.test('Deleted item returns not found', () => pm.expect(pm.response.json()).to.deep.eql({error: 'Menu item not found.'}));",
+                  "})();"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "14 Confirm reverse relationship is now empty",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/restaurants/{{parentId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(() => {",
+                  "pm.test('14 Confirm reverse relationship is now empty: HTTP 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Deleted child disappears from restaurant menuItems', () => pm.expect(pm.response.json().menuItems).to.deep.eql([]));",
+                  "})();"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "15 Delete this run\u2019s restaurant",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": "{{baseUrl}}/api/restaurants/{{parentId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(() => {",
+                  "pm.test('15 Delete this run\u2019s restaurant: HTTP 204', () => pm.response.to.have.status(204));",
+                  "pm.test('Parent cleanup has no response payload', () => pm.expect(pm.response.text()).to.eql(''));",
+                  "})();"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
