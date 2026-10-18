@@ -7,7 +7,11 @@
     "start": "node --env-file-if-exists=.env src/server.js",
     "dev": "node --watch --env-file-if-exists=.env src/server.js",
     "demo": "node scripts/demo.js",
-    "test": "node --test"
+    "test": "npm run test:legacy && npm run test:jest",
+    "test:legacy": "node --test test/*.test.js",
+    "test:jest": "jest --runInBand",
+    "test:mocked": "jest --runInBand --testPathPatterns=query.mocked",
+    "test:database": "jest --runInBand --testPathPatterns=query.database"
   },
   "engines": {
     "node": ">=22"
@@ -17,6 +21,7 @@
     "mongoose": "^9.0.0"
   },
   "devDependencies": {
+    "jest": "^30.5.2",
     "mongodb-memory-server": "^10.2.0",
     "supertest": "^7.1.0"
   }

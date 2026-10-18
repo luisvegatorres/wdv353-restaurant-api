@@ -85,3 +85,7 @@ Nine integration tests run the real routes against an isolated temporary MongoDB
 ## Assignment 3.4 — filtering, selection, sorting and pagination
 
 Both collection GET routes now support query-driven range filtering, field exclusion, sorting, and pagination. See [the assignment 3.4 guide](docs/assignment-3.4.md) for query parameters, response headers, examples, verification, and a video recording outline. GET response bodies remain arrays, but now default to 10 results per page; use `page` and `limit` to retrieve additional results.
+
+## Assignment 3.6 — Jest query tests
+
+Run `npm run test:mocked` and `npm run test:database` to exercise both query endpoints with and without mocked Mongoose methods. Each mode has 12 Jest tests. `npm test` runs the previous 16 tests plus both Jest modes. See [the assignment 3.6 guide](docs/assignment-3.6.md) for the requirement mapping, setup, test organization, and recording outline.
