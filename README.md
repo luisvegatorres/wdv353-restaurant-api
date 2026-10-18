@@ -80,3 +80,8 @@ Nine integration tests run the real routes against an isolated temporary MongoDB
 - [Mongoose connections](https://mongoosejs.com/docs/connections.html)
 - [Mongoose population and virtual relationships](https://mongoosejs.com/docs/populate.html)
 - [Express error handling](https://expressjs.com/en/guide/error-handling/)
+
+
+## Assignment 3.4 — filtering, selection, sorting and pagination
+
+Both collection GET routes now support query-driven range filtering, field exclusion, sorting, and pagination. See [the assignment 3.4 guide](docs/assignment-3.4.md) for query parameters, response headers, examples, verification, and a video recording outline. GET response bodies remain arrays, but now default to 10 results per page; use `page` and `limit` to retrieve additional results.

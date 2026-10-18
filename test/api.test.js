@@ -150,3 +150,63 @@ test('valid but missing IDs return shared not-found messages for GET, PUT and DE
   assert.equal(await Restaurant.countDocuments(), 0);
   assert.equal(await MenuItem.countDocuments(), 0);
 });
+
+test('3.4 restaurant ranges, query selection, sort and pagination work together', async () => {
+  await Restaurant.insertMany([
+    { ...restaurant, name: 'Alpha', rating: 3 },
+    { ...restaurant, name: 'Bravo', rating: 4 },
+    { ...restaurant, name: 'Charlie', rating: 5 },
+    { ...restaurant, name: 'Delta', rating: 4.5 },
+  ]);
+  const result = await request(app).get('/api/restaurants?minRating=4&maxRating=4.5&exclude=openedOn,menuItems&sort=-rating&page=1&limit=1').expect(200);
+  assert.equal(result.headers['x-total-count'], '2');
+  assert.equal(result.headers['x-total-pages'], '2');
+  assert.equal(result.body.length, 1);
+  assert.equal(result.body[0].name, 'Delta');
+  assert.equal(Object.hasOwn(result.body[0], 'openedOn'), false);
+  assert.equal(Object.hasOwn(result.body[0], 'menuItems'), false);
+  const second = await request(app).get('/api/restaurants?minRating=4&maxRating=4.5&sort=-rating&page=2&limit=1').expect(200);
+  assert.equal(second.body[0].name, 'Bravo');
+  const empty = await request(app).get('/api/restaurants?page=10&limit=1').expect(200);
+  assert.deepEqual(empty.body, []);
+});
+
+test('3.4 menu price bounds are inclusive; exclusion and pagination preserve relationships', async () => {
+  const parent = await Restaurant.create(restaurant);
+  await MenuItem.insertMany([10, 20, 30, 40].map((price) => ({ ...menuItem(parent.id), name: `Dish ${price}`, price })));
+  const result = await request(app).get('/api/menu-items?minPrice=20&maxPrice=30&exclude=category&sort=-price&limit=1&page=2').expect(200);
+  assert.equal(result.headers['x-total-count'], '2');
+  assert.equal(result.headers['x-page'], '2');
+  assert.equal(result.body[0].price, 20);
+  assert.equal(Object.hasOwn(result.body[0], 'category'), false);
+  assert.equal(result.body[0].restaurant.name, restaurant.name);
+  const excluded = await request(app).get('/api/menu-items?exclude=restaurant').expect(200);
+  assert.equal(Object.hasOwn(excluded.body[0], 'restaurant'), false);
+});
+
+test('3.4 rejects invalid query values and operator injection on both lists', async () => {
+  for (const [base, minKey, maxKey] of [
+    ['/api/restaurants', 'minRating', 'maxRating'],
+    ['/api/menu-items', 'minPrice', 'maxPrice'],
+  ]) {
+    for (const query of [
+      'page=0', 'limit=101', 'page=1.5', 'limit=abc', 'exclude=unknown', 'sort=$where',
+      `${minKey}=oops`, `${minKey}=`, `${minKey}=5&${maxKey}=2`,
+      `${minKey}=1&${minKey}=2`, '$where=true', 'exclude=name&exclude=price',
+    ]) await request(app).get(`${base}?${query}`).expect(400);
+  }
+});
+
+test('3.4 defaults paginate both lists and sorting is stable for equal values', async () => {
+  const parents = await Restaurant.insertMany(Array.from({ length: 12 }, (_, i) => ({ ...restaurant, name: `Restaurant ${i}`, rating: 4 })));
+  await MenuItem.insertMany(Array.from({ length: 12 }, (_, i) => ({ ...menuItem(parents[0].id), name: `Dish ${i}`, price: 10 })));
+  for (const [base, sort] of [['/api/restaurants', 'rating'], ['/api/menu-items', 'price']]) {
+    const result = await request(app).get(base).expect(200);
+    assert.equal(result.body.length, 10);
+    assert.equal(result.headers['x-total-count'], '12');
+    const first = await request(app).get(`${base}?sort=${sort}&page=1&limit=6`).expect(200);
+    const second = await request(app).get(`${base}?sort=${sort}&page=2&limit=6`).expect(200);
+    const ids = [...first.body, ...second.body].map((item) => item._id);
+    assert.equal(new Set(ids).size, 12);
+  }
+});
