@@ -1,3 +1,4 @@
+const { listQuery, paginationHeaders } = require('../utils/listQuery');
 const mongoose = require('mongoose');
 const MenuItem = require('../models/MenuItem');
 const Restaurant = require('../models/Restaurant');
@@ -14,7 +15,17 @@ async function checkRestaurant(id) {
 }
 
 exports.getAll = async (req, res) => {
-  res.json(await display(MenuItem.find().sort({ name: 1 })));
+  // Range filtering uses $gte and $lte; selection, sorting and paging run in MongoDB.
+  const options = listQuery(req.query, {
+    field: 'price', minKey: 'minPrice', maxKey: 'maxPrice', min: 0, max: 1000,
+    fields: ['name', 'price', 'available', 'category', 'restaurant'],
+  });
+  let query = MenuItem.find(options.filter).select(options.projection)
+    .sort(options.sort).skip(options.skip).limit(options.limit);
+  if (!options.excluded.includes('restaurant')) query = query.populate({ path: 'restaurant', select: '-__v' });
+  const [data, total] = await Promise.all([query.exec(), MenuItem.countDocuments(options.filter)]);
+  paginationHeaders(res, options, total);
+  res.json(data);
 };
 
 exports.getById = async (req, res) => {
