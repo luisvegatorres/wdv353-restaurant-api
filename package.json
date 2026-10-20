@@ -1,23 +1,16 @@
 {
-  "name": "wdv353-restaurant-api",
+  "name": "wdv353-restaurant-fullstack",
   "version": "1.0.0",
   "private": true,
-  "description": "Two related MongoDB collections with Express and Mongoose CRUD",
   "scripts": {
-    "start": "node --env-file-if-exists=.env src/server.js",
-    "dev": "node --watch --env-file-if-exists=.env src/server.js",
-    "demo": "node scripts/demo.js",
-    "test": "node --test"
+    "start": "npm start --prefix server",
+    "dev:server": "npm run dev --prefix server",
+    "dev:client": "npm run dev --prefix client",
+    "demo": "npm run demo --prefix server",
+    "build": "npm run build --prefix client",
+    "test": "npm test --prefix server && npm test --prefix client",
+    "test:e2e": "node --test test/fullstack.test.cjs",
+    "setup": "npm ci --prefix server && npm ci --prefix client"
   },
-  "engines": {
-    "node": ">=22"
-  },
-  "dependencies": {
-    "express": "^5.1.0",
-    "mongoose": "^9.0.0"
-  },
-  "devDependencies": {
-    "mongodb-memory-server": "^10.2.0",
-    "supertest": "^7.1.0"
-  }
+  "engines": { "node": ">=22.12" }
 }
